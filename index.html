@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>极简垃圾分类</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <style>
+        body { max-width: 600px; margin: 20px auto; padding: 20px; }
+        #preview { max-width: 200px; margin: 10px 0; }
+        #result { margin-top: 15px; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h2>上传垃圾图片</h2>
+    <input type="file" id="upload" accept="image/*">
+    <div><img id="preview"></div>
+    <div id="result">等待图片上传...</div>
+
+    <script>
+        // 配置项（需修改为你的模型路径）
+        const MODEL_URL = 'https://cdn.jsdelivr.net/gh/wjlca/waste/model/model.json';
+        const LABELS = ["纸类", "厨余", "玻璃", "金属", "其他", "塑料", "纺织品", "植被"];
+
+        // 加载模型
+        let model;
+        tf.loadGraphModel(MODEL_URL).then(m => {
+            model = m;
+            document.getElementById('result').textContent = "loaded，plese upload";
+        });
+
+        // 图片上传处理
+        document.getElementById('upload').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // 显示预览
+            const img = document.getElementById('preview');
+            img.src = URL.createObjectURL(file);
+
+            // 预处理图片
+            const tensor = tf.browser.fromPixels(img)
+                .resizeNearestNeighbor([224, 224])
+                .toFloat()
+                .div(255)
+                .expandDims();
+
+            // 执行预测
+            const preds = await model.predict(tensor).data();
+            const topIndex = preds.indexOf(Math.max(...preds));
+
+            // 显示结果
+            document.getElementById('result').innerHTML = `
+                <strong>识别结果：</strong>${LABELS[topIndex]}<br>
+                <small>置信度：${(preds[topIndex]*100).toFixed(1)}%</small>
+            `;
+
+            tf.dispose([tensor]); // 释放内存
+        });
+    </script>
+</body>
+</html>
